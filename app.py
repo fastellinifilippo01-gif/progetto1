@@ -12,7 +12,7 @@ K_FACTOR = 32
 RATING_INIZIALE = 1500
 CACHE_TTL = 30  # Cache dura 30 secondi
 
-st.set_page_config(page_title="Federazione Scacchistica", layout="wide", page_icon="♟️")
+st.set_page_config(page_title="FFSCACCHI", layout="wide", page_icon="♟️")
 
 # --- CONNESSIONE DATABASE ---
 @st.cache_resource
