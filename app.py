@@ -10,13 +10,13 @@ import time
 SHEET_NAME = "Scacchi_DB"
 K_FACTOR = 32
 RATING_INIZIALE = 1500
-CACHE_TTL = 30  # Cache dura 30 secondi
 
-st.set_page_config(page_title="FFSCACCHI", layout="wide", page_icon="♟️")
+st.set_page_config(page_title="Federazione Scacchistica", layout="wide", page_icon="♟️")
 
 # --- CONNESSIONE DATABASE ---
 @st.cache_resource
 def get_gc():
+    """Connessione a Google Sheets (cache permanente)"""
     try:
         secrets = st.secrets["google_credentials"]
         credentials_info = json.loads(secrets["json_content"])
@@ -30,9 +30,8 @@ def get_gc():
         st.error(f"❌ Errore connessione Google: {str(e)}")
         return None
 
-@st.cache_data(ttl=CACHE_TTL)
-def get_all_data(gc, sheet_name, _timestamp):
-    """Legge TUTTI i fogli in UNA sola chiamata allo spreadsheet"""
+def get_all_data(gc, sheet_name):
+    """Legge i dati dai fogli Google (SENZA cache problematica)"""
     try:
         spreadsheet = gc.open(sheet_name)
         data = {}
@@ -55,7 +54,7 @@ def safe_api_call(func, max_retries=3):
         except gspread.exceptions.APIError as e:
             if "429" in str(e) or "Quota exceeded" in str(e):
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Backoff esponenziale: 2s, 4s, 8s
+                    wait_time = 2 ** attempt
                     st.warning(f"⏳ Limite API raggiunto. Attendo {wait_time}s...")
                     time.sleep(wait_time)
                 else:
@@ -93,8 +92,6 @@ def swiss_pairing(players, past_matches):
 # --- GESTIONE SESSIONE ---
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
-if 'data_timestamp' not in st.session_state:
-    st.session_state.data_timestamp = 0
 
 def check_admin():
     if not st.session_state.admin_logged_in:
@@ -106,19 +103,17 @@ def logout():
     st.session_state.admin_logged_in = False
     st.rerun()
 
-def invalidate_cache():
-    """Forza il refresh dei dati aggiornando il timestamp"""
-    st.session_state.data_timestamp = time.time()
-
 # --- INTERFACCIA ---
 st.title("♟️ Federazione Scacchistica Amatoriale")
 
+# Inizializza connessione (con cache resource)
 gc = get_gc()
 if not gc:
     st.stop()
 
-# Carica dati con cache (usa timestamp per invalidare quando serve)
-data = get_all_data(gc, SHEET_NAME, st.session_state.data_timestamp)
+# Carica dati OGNI VOLTA (no cache data per evitare errori hash)
+# Per un torneo piccolo (<100 giocatori) è sufficientemente veloce
+data = get_all_data(gc, SHEET_NAME)
 df_giocatori, ws_giocatori = data.get("Giocatori", (pd.DataFrame(), None))
 df_tornei, ws_tornei = data.get("Tornei", (pd.DataFrame(), None))
 df_partite, ws_partite = data.get("Partite", (pd.DataFrame(), None))
@@ -216,16 +211,15 @@ elif menu == "🛡️ Admin Panel":
     with tab1:
         nome = st.text_input("Nome Torneo")
         tipo = st.selectbox("Formato", ["Svizzero", "Girone All'Italiana"])
-        data = st.date_input("Data", datetime.now())
+        data_t = st.date_input("Data", datetime.now())
         if st.button("Crea") and nome and ws_tornei is not None:
             def _create():
                 id_t = f"TOR_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                ws_tornei.append_row([id_t, nome, str(data), tipo, "In Programmazione"])
+                ws_tornei.append_row([id_t, nome, str(data_t), tipo, "In Programmazione"])
                 return id_t
             result = safe_api_call(_create)
             if result:
                 st.success(f"✅ Creato! ID: {result}")
-                invalidate_cache()
                 st.rerun()
     
     with tab2:
@@ -267,7 +261,6 @@ elif menu == "🛡️ Admin Panel":
                                 ws_giocatori.update_cell(idx2, 3, n2)
                     safe_api_call(_save)
                     st.success("✅ Salvato!")
-                    invalidate_cache()
                     st.session_state['pairings'] = None
                     st.rerun()
     
@@ -282,7 +275,6 @@ elif menu == "🛡️ Admin Panel":
                     ws_giocatori.append_row([f"PL_{datetime.now().strftime('%Y%m%d%H%M%S')}", nome, rating, ""])
                 safe_api_call(_add)
                 st.success("✅ Aggiunto!")
-                invalidate_cache()
                 st.rerun()
 
 st.divider()
