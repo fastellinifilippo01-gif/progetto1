@@ -6,10 +6,10 @@ from datetime import datetime
 import json
 
 # --- CONFIGURAZIONE ---
-SHEET_NAME = "Scacchi_DB"
+SHEET_NAME = "Scacchi_DB"  # ← CONTROLLA CHE CORRISPONDA AL NOME DEL FILE GOOGLE
 K_FACTOR = 32
 
-st.set_page_config(page_title="FFCHESS", layout="wide", page_icon="♟️")
+st.set_page_config(page_title="Federazione Scacchistica", layout="wide", page_icon="♟️")
 
 # --- CONNESSIONE DATABASE ---
 @st.cache_resource
@@ -21,9 +21,10 @@ def get_gc():
             credentials_info,
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
-        return gspread.authorize(creds)
+        gc = gspread.authorize(creds)
+        return gc
     except Exception as e:
-        st.error(f"Errore connessione DB: {e}")
+        st.error(f"❌ Errore connessione Google: {str(e)}")
         return None
 
 def get_sheet_data(gc, sheet_name, worksheet_name):
@@ -32,8 +33,21 @@ def get_sheet_data(gc, sheet_name, worksheet_name):
         worksheet = spreadsheet.worksheet(worksheet_name)
         data = worksheet.get_all_records()
         return pd.DataFrame(data), worksheet
-    except:
+    except gspread.exceptions.WorksheetNotFound:
+        st.error(f"❌ Foglio '{worksheet_name}' NON TROVATO nel file '{sheet_name}'")
+        st.info("Controlla che i nomi dei fogli siano ESATTI: Giocatori, Tornei, Partite")
         return pd.DataFrame(), None
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error(f"❌ File Google Sheet '{sheet_name}' NON TROVATO")
+        st.info("Controlla il nome del file e i permessi della Service Account")
+        return pd.DataFrame(), None
+    except Exception as e:
+        st.error(f"❌ Errore generico: {str(e)}")
+        return pd.DataFrame(), None
+
+# ... (il resto del codice rimane uguale a prima) ...
+# [Per brevità, mantieni tutto il resto del codice che ti ho dato prima]
+# [Assicurati solo che le funzioni get_gc e get_sheet_data siano sostituite con queste nuove]
 
 # --- FUNZIONI LOGICHE ---
 def calculate_elo(rating_a, rating_b, score_a):
