@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 
 # --- CONFIGURAZIONE ---
-SHEET_NAME = "Scacchi_DB"  # ← DEVE COINCIDERE CON IL NOME DEL TUO FILE GOOGLE SHEET
+SHEET_NAME = "Scacchi_DB"
 K_FACTOR = 32
 RATING_INIZIALE = 1500
 
@@ -18,9 +18,16 @@ def get_gc():
     try:
         secrets = st.secrets["google_credentials"]
         credentials_info = json.loads(secrets["json_content"])
+        
+        # Scopes espliciti per Sheets e Drive
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
         creds = Credentials.from_service_account_info(
             credentials_info,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            scopes=scopes
         )
         gc = gspread.authorize(creds)
         return gc
@@ -35,14 +42,17 @@ def get_sheet_data(gc, sheet_name, worksheet_name):
         data = worksheet.get_all_records()
         return pd.DataFrame(data), worksheet, spreadsheet
     except gspread.exceptions.WorksheetNotFound:
-        st.error(f"❌ Foglio '{worksheet_name}' NON TROVATO. Controlla i nomi delle tab in basso.")
+        st.error(f"❌ Foglio '{worksheet_name}' NON TROVATO.")
         return pd.DataFrame(), None, None
     except gspread.exceptions.SpreadsheetNotFound:
-        st.error(f"❌ File '{sheet_name}' NON TROVATO. Controlla il nome del file e i permessi.")
+        st.error(f"❌ File '{sheet_name}' NON TROVATO.")
         return pd.DataFrame(), None, None
     except Exception as e:
         st.error(f"❌ Errore generico: {str(e)}")
         return pd.DataFrame(), None, None
+
+# ... [Il resto del codice rimane uguale a prima] ...
+# [Mantieni tutte le funzioni e l'interfaccia che ti ho dato nell'ultimo messaggio]
 
 # --- FUNZIONI LOGICHE ---
 def calculate_elo(rating_a, rating_b, score_a):
