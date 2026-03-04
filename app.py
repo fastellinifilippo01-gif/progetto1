@@ -1,20 +1,19 @@
-# Improved app.py
+# Updated FFchess Application Code
 
-def validate_input(data):
-    # Add robust validation for input data
-    if not isinstance(data, dict):
-        raise ValueError("Input must be a dictionary")
-    # Additional validation rules can be added here
+class Classifica:
+    def __init__(self):
+        self.torneo = []  # List to hold tournament participants
 
-def main():
-    try:
-        # Example of input data
-        input_data = {'key': 'value'}
-        validate_input(input_data)
-        # Functionality of app goes here
-    except Exception as e:
-        print(f'Error occurred: {e}')
-        # Handle exceptions gracefully
+    def aggiungi_partecipante(self, partecipante):
+        self.torneo.append(partecipante)
 
-if __name__ == '__main__':
-    main()
+    def rimuovi_partecipante(self, partecipante):
+        self.torneo.remove(partecipante)
+
+    def ordina_classifica(self):
+        sorted_torneo = sorted(self.torneo, key=lambda p: p.punti, reverse=True)
+        return sorted_torneo
+
+    def mostra_classifica(self):
+        for partecipante in self.ordina_classifica():
+            print(partecipante.nome, partecipante.punti)
