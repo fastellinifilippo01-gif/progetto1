@@ -22,7 +22,10 @@ def get_gc():
         credentials_info = json.loads(secrets["json_content"])
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-        return gspread.authorize(creds)
+        gc = gspread.authorize(creds)
+        # Test connessione
+        gc.open(SHEET_NAME)
+        return gc
     except Exception as e:
         st.error(f"❌ Errore connessione: {str(e)}")
         return None
@@ -59,6 +62,9 @@ def safe_api_call(func, max_retries=3):
                     st.error("❌ Troppe richieste. Usa 🔄 Refresh tra 1 minuto.")
                     return None
             raise
+        except Exception as e:
+            st.error(f"❌ Errore API: {str(e)}")
+            return None
     return None
 
 # --- FUNZIONI LOGICHE ---
@@ -128,6 +134,10 @@ df_giocatori, ws_giocatori = data.get("Giocatori", (pd.DataFrame(), None))
 df_tornei, ws_tornei = data.get("Tornei", (pd.DataFrame(), None))
 df_partite, ws_partite = data.get("Partite", (pd.DataFrame(), None))
 df_partecipanti, ws_partecipanti = data.get("Partecipanti", (pd.DataFrame(), None))
+
+# Verifica permessi scrittura
+if ws_giocatori is None:
+    st.error("❌ Nessun accesso in scrittura al foglio 'Giocatori'. Controlla i permessi della Service Account.")
 
 menu_opts = ["🏠 Home", "🏆 Classifica FIDE", "📅 Tornei"]
 if st.session_state.admin_logged_in:
@@ -323,19 +333,23 @@ elif menu == "🛡️ Admin":
         
         st.divider()
         st.subheader("➕ Aggiungi Giocatore")
-        c1, c2 = st.columns(2)
-        with c1:
-            nome_giocatore = st.text_input("Nome", key="txt_nome_giocatore")
-        with c2:
-            rating_giocatore = st.number_input("Rating", value=RATING_INIZIALE, key="num_rating_giocatore")
         
-        if st.button("Aggiungi", key="btn_aggiungi_giocatore"):
-            if nome_giocatore and ws_giocatori is not None:
-                def _add():
-                    ws_giocatori.append_row([f"PL_{datetime.now().strftime('%Y%m%d%H%M%S')}", nome_giocatore, rating_giocatore, ""])
-                safe_api_call(_add)
-                st.success("✅ Giocatore aggiunto!")
-                refresh_data()
+        if ws_giocatori is None:
+            st.error("❌ Nessun accesso in scrittura. Controlla i permessi.")
+        else:
+            c1, c2 = st.columns(2)
+            with c1:
+                nome_giocatore = st.text_input("Nome", key="txt_nome_giocatore")
+            with c2:
+                rating_giocatore = st.number_input("Rating", value=RATING_INIZIALE, key="num_rating_giocatore")
+            
+            if st.button("Aggiungi", key="btn_aggiungi_giocatore"):
+                if nome_giocatore:
+                    def _add():
+                        ws_giocatori.append_row([f"PL_{datetime.now().strftime('%Y%m%d%H%M%S')}", nome_giocatore, rating_giocatore, ""])
+                    safe_api_call(_add)
+                    st.success("✅ Giocatore aggiunto!")
+                    refresh_data()
 
 st.divider()
 st.markdown("<div style='text-align:center;color:gray;font-size:12px;'>⚠️ FFchess - App Amatoriale Non Ufficiale FIDE</div>", unsafe_allow_html=True)
